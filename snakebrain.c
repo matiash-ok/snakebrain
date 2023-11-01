@@ -50,8 +50,7 @@ typedef struct apple_struct {
 }apple_t;
 
 apple_t *apple;
-snake_t *head;
-snake_t *tail;
+snake_t *head; snake_t *tail;
 int snake_length = 1;
 
 void init_snake();
@@ -59,6 +58,7 @@ void init_apple();
 void eat_apple();
 void increase_snake();
 void move_snake();
+void collision_check();
 void change_dir(int dir);
 void render_snake(SDL_Renderer *renderer, int x , int y );
 void render_grid(SDL_Renderer *renderer, int x , int y );
@@ -96,12 +96,14 @@ int main(){
     int grid_y = 100 + (WINDOW_HEIGHT / 2) - (GRID_DIM / 2);
 
     bool quit = false;
+    int prev_dir_event;
 
     SDL_Event event;
     init_snake();
     init_apple();
 
     while(!quit){
+        prev_dir_event = 0 ;
         SDL_Delay(VELOCITY);
         while(SDL_PollEvent(&event)){
             switch(event.type){
@@ -116,9 +118,13 @@ int main(){
                             quit=true;
                             break;
                         case SDLK_LEFT:
+                            if(prev_dir_event == -1) break;
+                            prev_dir_event = -1;
                             change_dir(-1);
                             break;
                         case SDLK_RIGHT:
+                            if(prev_dir_event == 1) break;
+                            prev_dir_event = 1;
                             change_dir(1);
                             break;
                     }
@@ -143,8 +149,6 @@ int main(){
     SDL_DestroyWindow(window);
     SDL_Quit();
 
-    printf("hello world\n");
-
     return 0;
 }
 
@@ -156,7 +160,6 @@ void init_snake(){
     new -> dir = SNAKE_UP;
     new ->next = NULL ;
 
-    printf("address of the init head and tail they are the same %p\n",new);
     head = new ;
     tail = new ;
 
@@ -246,7 +249,6 @@ void render_grid(SDL_Renderer *renderer, int x , int y ){
 
 void move_snake(){
 
-
     snake_t *snake_cell      = head;
     int next_dir = 6;
 
@@ -267,6 +269,8 @@ void move_snake(){
                 snake_cell -> x = snake_cell -> x + 1;
                 break;
         }
+
+        if(next_dir == 6 ) collision_check();
 
         if(snake_cell -> x == apple -> x && snake_cell -> y == apple -> y){
             can_eat_apple = true;
@@ -325,4 +329,32 @@ void render_apple(SDL_Renderer *renderer, int x , int y ){
 void eat_apple(){
     locate_apple(apple);
     increase_snake();
+}
+
+void reset(){
+    snake_t *snake_cell = head;
+
+    while(snake_cell != NULL){
+       snake_t *snake_cell2 = snake_cell;
+       snake_cell = snake_cell -> next;
+       free(snake_cell2);
+    }
+    init_snake();
+}
+void collision_check(){
+    if( head -> x < 0 || head -> x == GRID_SIZE ||
+        head -> y < 0 || head -> y == GRID_SIZE) reset();
+
+    snake_t *new_snake_cell = head -> next;
+    bool did_reset = false;
+    while(new_snake_cell != NULL || did_reset){
+        if(head -> x == new_snake_cell -> x && head -> y == new_snake_cell -> y) {
+            reset();
+            did_reset = true;
+            break;
+        }
+
+        new_snake_cell = new_snake_cell -> next;
+
+    }
 }
