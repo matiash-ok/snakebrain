@@ -49,16 +49,16 @@ typedef struct apple_struct {
     int y;
 }apple_t;
 
-apple_t *apple;
+apple_t Apple;
 snake_t *head; snake_t *tail;
 int snake_length = 1;
 
 void init_snake();
 void init_apple();
-void eat_apple();
+void detect_apple();
 void increase_snake();
 void move_snake();
-void collision_check();
+bool collision_check();
 void change_dir(int dir);
 void render_snake(SDL_Renderer *renderer, int x , int y );
 void render_grid(SDL_Renderer *renderer, int x , int y );
@@ -139,10 +139,10 @@ int main(){
     render_apple(renderer,grid_x,grid_y);
     render_snake(renderer,grid_x,grid_y);
     move_snake();
+    detect_apple();
     // RENDER LOOP END
     SDL_SetRenderDrawColor( renderer, 0x00, 0x00 ,0x00,255);
     SDL_RenderPresent(renderer);
-
     }
 
     SDL_DestroyRenderer(renderer);
@@ -199,8 +199,8 @@ void increase_snake(){
 
 void render_snake(SDL_Renderer *renderer, int x , int y ){
 
+    SDL_SetRenderDrawColor(renderer, 0x00 , 0xcc, 0x00 ,  255);
     SDL_Rect snake_cell;
-    bool change_color = false;
     int cell_size = GRID_DIM / GRID_SIZE;
     snake_cell.w = cell_size;
     snake_cell.h = cell_size;
@@ -208,26 +208,19 @@ void render_snake(SDL_Renderer *renderer, int x , int y ){
     snake_t *next = head;
 
     do{
-        if(change_color){
-            SDL_SetRenderDrawColor(renderer, 0x00 , 0xcc, 0x00 ,  255);
-        }else{
-            SDL_SetRenderDrawColor(renderer, 0xff , 0xcc, 0x00 ,  255);
-        }
-
         snake_cell.x  = x + ( next -> x * cell_size);
         snake_cell.y  = y + ( next -> y * cell_size);
 
         SDL_RenderFillRect(renderer,&snake_cell);
 
         next = next-> next;
-        change_color = !change_color;
 
     } while(next != NULL);
 }
 
 void render_grid(SDL_Renderer *renderer, int x , int y ){
 
-    SDL_SetRenderDrawColor( renderer, 0x55, 0x55 ,0x55,255 );
+    SDL_SetRenderDrawColor( renderer, 0x15, 0x15 ,0x15,255 );
 
     int cell_size = GRID_DIM / GRID_SIZE;
 
@@ -240,7 +233,7 @@ void render_grid(SDL_Renderer *renderer, int x , int y ){
         for (int j = 0 ; j < GRID_SIZE ; j++){
             cell.x  = x + ( i * cell_size);
             cell.y  = y + ( j * cell_size);
-            SDL_RenderDrawRect(renderer,&cell);
+            SDL_RenderFillRect(renderer,&cell);
         }
     }
 
@@ -249,44 +242,46 @@ void render_grid(SDL_Renderer *renderer, int x , int y ){
 
 void move_snake(){
 
-    snake_t *snake_cell      = head;
-    int next_dir = 6;
+    int prev_x = head -> x;
+    int prev_y = head -> y;
+    int prev_dir = head -> dir;
 
-    do{
-        bool can_eat_apple = false;
-
-        switch(snake_cell -> dir){
-            case SNAKE_UP:
-                snake_cell -> y = snake_cell -> y - 1;
-                break;
-            case SNAKE_LEFT:
-                snake_cell -> x = snake_cell -> x - 1;
-                break;
-            case SNAKE_DOWN:
-                snake_cell -> y = snake_cell -> y + 1;
-                break;
-            case SNAKE_RIGHT:
-                snake_cell -> x = snake_cell -> x + 1;
-                break;
-        }
-
-        if(next_dir == 6 ) collision_check();
-
-        if(snake_cell -> x == apple -> x && snake_cell -> y == apple -> y){
-            can_eat_apple = true;
-        }
-
-        int temp_dir = snake_cell -> dir;
-        if(next_dir != 6) snake_cell -> dir = next_dir;
-        next_dir  = temp_dir;
-
-        snake_cell = snake_cell -> next ;
-
-        if(can_eat_apple) eat_apple();
+    switch(head -> dir){
+        case SNAKE_UP:
+            head -> y--;
+            break;
+        case SNAKE_LEFT:
+            head -> x--;
+            break;
+        case SNAKE_DOWN:
+            head -> y++;
+            break;
+        case SNAKE_RIGHT:
+            head -> x++;
+            break;
     }
 
-    while(snake_cell != NULL);
+    if(collision_check()) return;
 
+    snake_t *snake_cell = head;
+
+    if(snake_cell -> next != NULL) snake_cell = snake_cell -> next;
+
+    while(snake_cell != NULL){
+        int temp_x = snake_cell -> x ;
+        int temp_y = snake_cell -> y ;
+        int temp_dir = snake_cell -> dir ;
+
+        snake_cell -> x = prev_x ;
+        snake_cell -> y = prev_y ;
+        snake_cell -> dir = prev_dir ;
+
+        prev_x = temp_x;
+        prev_y = temp_y;
+        prev_dir = temp_dir;
+
+        snake_cell = snake_cell -> next;
+    }
 }
 
 void change_dir(int dir){
@@ -302,15 +297,29 @@ void change_dir(int dir){
     return;
 }
 
-void locate_apple(apple_t *new_apple){
-    new_apple -> x = rand() % GRID_SIZE/2;
-    new_apple -> y = rand() % GRID_SIZE/2;
+void locate_apple(){
+
+    int new_x , new_y;
+    bool in_snake;
+    do {
+        in_snake = false;
+        new_x =  rand() % GRID_SIZE;
+        new_y =  rand() % GRID_SIZE;
+
+        snake_t *snake_cell = head;
+        while(snake_cell != NULL){
+            if(snake_cell -> x == new_x && snake_cell -> y == new_y) in_snake = true;
+            snake_cell = snake_cell -> next;
+        };
+
+    }while (in_snake);
+
+    Apple.x = new_x;
+    Apple.y = new_y;
 }
 
 void init_apple(){
-    apple_t *new_apple = malloc(sizeof(apple_t));
-    locate_apple(new_apple);
-    apple = new_apple;
+    locate_apple();
 }
 
 void render_apple(SDL_Renderer *renderer, int x , int y ){
@@ -321,14 +330,16 @@ void render_apple(SDL_Renderer *renderer, int x , int y ){
 
     apple_cell.h =cell_size;
     apple_cell.w =cell_size;
-    apple_cell.x = x + apple -> x * cell_size ;
-    apple_cell.y = y + apple -> y * cell_size ;
+    apple_cell.x = x + Apple.x * cell_size ;
+    apple_cell.y = y + Apple.y * cell_size ;
     SDL_RenderFillRect(renderer,&apple_cell);
 }
 
-void eat_apple(){
-    locate_apple(apple);
-    increase_snake();
+void detect_apple(){
+    if(head -> x == Apple.x && head -> y == Apple.y){
+        locate_apple();
+        increase_snake();
+    }
 }
 
 void reset(){
@@ -341,9 +352,12 @@ void reset(){
     }
     init_snake();
 }
-void collision_check(){
+bool collision_check(){
     if( head -> x < 0 || head -> x == GRID_SIZE ||
-        head -> y < 0 || head -> y == GRID_SIZE) reset();
+        head -> y < 0 || head -> y == GRID_SIZE){
+        reset();
+        return true;
+    }
 
     snake_t *new_snake_cell = head -> next;
     bool did_reset = false;
@@ -355,6 +369,6 @@ void collision_check(){
         }
 
         new_snake_cell = new_snake_cell -> next;
-
     }
+    return did_reset;
 }
