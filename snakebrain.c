@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <math.h>
 
 #if 0
 //
@@ -23,7 +24,7 @@
 #define WINDOW_Y 0
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
-#define VELOCITY 200
+#define VELOCITY 100
 #endif
 
 #define GRID_SIZE 19
@@ -53,6 +54,7 @@ apple_t Apple;
 snake_t *head; snake_t *tail;
 int snake_length = 1;
 
+void ia();
 void init_snake();
 void init_apple();
 void detect_apple();
@@ -139,6 +141,7 @@ int main(){
     render_apple(renderer,grid_x,grid_y);
     render_snake(renderer,grid_x,grid_y);
     move_snake();
+    ia();
     detect_apple();
     // RENDER LOOP END
     SDL_SetRenderDrawColor( renderer, 0x00, 0x00 ,0x00,255);
@@ -371,4 +374,150 @@ bool collision_check(){
         new_snake_cell = new_snake_cell -> next;
     }
     return did_reset;
+}
+
+enum{
+  TRY_LEFT,
+  TRY_RIGHT,
+  TRY_FOWARD
+};
+
+int state(int try){
+  int reward = 0;
+  int snake_x = head -> x; 
+  int snake_y = head -> y;
+  int snake_dir = head -> dir;
+
+  switch(try){
+    case TRY_LEFT:
+              if(snake_dir == SNAKE_UP ){
+                  snake_dir = SNAKE_LEFT;
+              }else{
+                  snake_dir--;
+              } 
+              
+      break;
+    case TRY_RIGHT:
+      if(snake_dir == SNAKE_LEFT){
+        snake_dir = SNAKE_UP; 
+      }else{
+        snake_dir++;
+      }
+      break;
+    case TRY_FOWARD:
+      break;
+  }
+
+
+  printf("que pasa si sigo yendo por?: ");
+  switch(snake_dir){
+    case SNAKE_UP:
+      printf("UP\n");
+    break;
+    case SNAKE_DOWN:
+      printf("DOWN\n");
+    break;
+    case SNAKE_LEFT:
+      printf("LEFT\n");
+    break;
+    case SNAKE_RIGHT:
+      printf("RIGHT\n");
+    break;
+  }
+  int sum_x = (int)sin(M_PI / 2 * (snake_dir));
+  int sum_y = (int)sin(M_PI / 2 * (snake_dir+3));
+
+  snake_x = snake_x + sum_x;
+  snake_y = snake_y + sum_y;
+
+  printf("snake_x %d\n",snake_x);
+  printf("snake_y %d\n",snake_y);
+
+  if(snake_x < 1 || snake_x > 17 || 
+     snake_y < 1 || snake_y > 17
+     ){
+  printf("\tNO CONVIENE SEGUIR \n");
+    if(snake_x < 1) printf("\t SNAKE_X ES MENOR QUE 2\n");
+    if(snake_y < 1) printf("\t SNAKE_Y ES MENOR QUE 2\n");
+    if(snake_x > 17) printf("\t SNAKE_X ES MAYOR QUE 17\n");
+    if(snake_y > 17) printf("\t SNAKE_Y ES MAYOR QUE 17\n");
+  reward = -100;
+  }
+  
+  unsigned int old_travel_x = abs(Apple.x - head->x);
+  unsigned int old_travel_y = abs(Apple.y - head->y);
+
+  unsigned int new_travel_x = abs(Apple.x - snake_x);
+  unsigned int new_travel_y = abs(Apple.y - snake_y);
+
+  bool more_close_to_apple = new_travel_x <= old_travel_x  && new_travel_y <= old_travel_y;
+  if(more_close_to_apple){
+    reward = reward + 5;
+  };
+
+  snake_t *snake_cell = head -> next;  
+  bool end_loop = false;
+
+  while(snake_cell != NULL || end_loop){
+      if(snake_x == snake_cell -> x && snake_y == snake_cell -> y){
+      end_loop = true;
+      reward = reward - 100;
+      break;
+    }
+    snake_cell = snake_cell -> next ; 
+  }
+  
+  return reward;
+}
+
+void ia(){
+  // int flag = 0 ; 
+  // int snakeX = head -> x;
+  // int snakeY = head -> y;
+  // int snakeDir = head -> dir;
+  //
+  printf("head x : %d\n",head->x);
+  printf("head y : %d\n",head->y);
+
+  printf("direction: ");
+  switch(head->dir){
+    case SNAKE_UP:
+      printf("UP\n");
+    break;
+    case SNAKE_DOWN:
+      printf("DOWN\n");
+    break;
+    case SNAKE_LEFT:
+      printf("LEFT\n");
+    break;
+    case SNAKE_RIGHT:
+      printf("RIGHT\n");
+    break;
+  }
+
+  
+  printf("PRUEBO IZQUIERDA \n");
+  int try_l =  state(TRY_LEFT) ; 
+  printf("PRUEBA DERECHA\n");
+  int try_r =  state(TRY_RIGHT) ; 
+  printf("PRUEBO SEGUIR DE LARGO\n");
+  int try_f =  state(TRY_FOWARD) ; 
+
+      printf("==================================\n");
+  if(try_f >= try_l && try_f >= try_r){
+      // gana TRY_F 
+      printf("SIGO DERECHO\n");
+  }else{
+      if(try_r >= try_l){
+      // gana TRY_R 
+      change_dir(1);
+      printf("GIRO PA LA DERECHA\n");
+      }else{
+    // gana TRY_L
+      change_dir(-1);
+      printf("GIRO PA LA IZQUIERDA\n");
+      }
+  }
+      printf("==================================\n");
+      printf("\n---------\n");
 }
